@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=OpenSnitch-tde
+Exec=opensnitch-tde
+Icon=opensnitchtde.png
+GenericName=OpenSnitch Firewall
+Comment=Interactive application firewall
+Terminal=false
+Categories=System;Settings;Network;
+StartupNotify=true
+X-TDE-StartupNotify=true
