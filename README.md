@@ -2,7 +2,7 @@
 
 ![Konqi opensnitch](konqi_opensnitch.png)
 
-This repository contains a native C++ port of the original OpenSnitch graphical user interface.
+This repository contains a native C++/tqt3 port of the original OpenSnitch graphical user interface.
 
 ## Credits / Upstream
 
