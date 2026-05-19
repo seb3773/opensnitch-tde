@@ -376,6 +376,7 @@ void NotificationsCallData::cancel()
 {
     m_ctx.TryCancel();
     m_server->unregisterNotifications(this);
+    delete this;
 }
 
 void NotificationsCallData::sendNotification(const protocol::Notification& notif)
@@ -404,7 +405,7 @@ TQString NotificationsCallData::peerAddr() const
 // GRpcServer
 // ============================================================================
 GRpcServer::GRpcServer()
-    : m_cq(0), m_notifyCq(0), m_running(false)
+    : m_cq(0), m_notifyCq(0), m_running(false), m_threadsStarted(false)
 {
     pthread_mutex_init(&m_notifsLock, 0);
 }
@@ -466,6 +467,7 @@ bool GRpcServer::start(const TQString& socket, int maxWorkers)
     // Start CQ threads
     pthread_create(&m_cqThread, 0, cqThreadFunc, this);
     pthread_create(&m_notifyCqThread, 0, notifyCqThreadFunc, this);
+    m_threadsStarted = true;
 
     // Init accept calls
     initAccepts();
@@ -488,11 +490,12 @@ void GRpcServer::stop()
         m_notifyCq->Shutdown();
     }
 
-    // Wait for threads
-    if (m_cqThread)
+    // Wait for threads (only if they were actually started)
+    if (m_threadsStarted) {
         pthread_join(m_cqThread, 0);
-    if (m_notifyCqThread)
         pthread_join(m_notifyCqThread, 0);
+        m_threadsStarted = false;
+    }
 }
 
 void GRpcServer::initAccepts()

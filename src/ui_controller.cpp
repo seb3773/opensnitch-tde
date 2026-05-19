@@ -128,16 +128,28 @@ static int tqt_try_init_libnotify()
 
 static const char* ensure_notify_icon_tmp()
 {
-    static const char* kPath = "/tmp/opensnitch_icon.png";
+    // Use XDG_RUNTIME_DIR (e.g. /run/user/1000) to avoid TOCTOU on /tmp.
+    // Falls back to /tmp if not set.
+    static char s_path[256] = {0};
     static int inited = 0;
     if (inited)
-        return kPath;
+        return s_path[0] ? s_path : 0;
     inited = 1;
 
-    if (access(kPath, R_OK) == 0)
-        return kPath;
+    const char* rtdir = getenv("XDG_RUNTIME_DIR");
+    if (rtdir && rtdir[0])
+        snprintf(s_path, sizeof(s_path), "%s/opensnitch_icon.png", rtdir);
+    else
+        snprintf(s_path, sizeof(s_path), "/tmp/opensnitch_icon_%d.png", (int)getuid());
 
-    int fd = open(kPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (access(s_path, R_OK) == 0)
+        return s_path;
+
+    int fd = open(s_path, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600);
+    if (fd < 0) {
+        // File may have been created between access() and open(); try without O_EXCL
+        fd = open(s_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    }
     if (fd < 0)
         return 0;
 
@@ -146,7 +158,7 @@ static const char* ensure_notify_icon_tmp()
     ssize_t wr = write(fd, (const void*)data, (size_t)len);
     (void)wr;
     close(fd);
-    return kPath;
+    return s_path;
 }
 
 static void tqt_send_notify(const TQString& summary, const TQString& body)
@@ -155,8 +167,6 @@ static void tqt_send_notify(const TQString& summary, const TQString& body)
         return;
 
     const char* iconPath = ensure_notify_icon_tmp();
-    if (!iconPath)
-        iconPath = 0;
     const TQCString s = summary.utf8();
     const TQCString b = body.utf8();
 
@@ -250,26 +260,26 @@ UIController::~UIController()
 
 void UIController::customEvent(TQCustomEvent* ev)
 {
-    if (ev->type() == PingStatsEventId) {
+    if ((int)ev->type() == PingStatsEventId) {
         PingStatsEvent* pse = static_cast<PingStatsEvent*>(ev);
         populateStats(pse->peer(), pse->request().stats());
         return;
     }
 
-    if (ev->type() == SubscribeEventId) {
+    if ((int)ev->type() == SubscribeEventId) {
         SubscribeEvent* se = static_cast<SubscribeEvent*>(ev);
         emit daemonSubscribed(se->peer(), se->firewallRunning());
         return;
     }
 
-    if (ev->type() == NotificationReplyEventId) {
+    if ((int)ev->type() == NotificationReplyEventId) {
         NotificationReplyEvent* ne = static_cast<NotificationReplyEvent*>(ev);
         const protocol::NotificationReply& r = ne->reply();
         emit notificationReply(ne->peer(), (unsigned long long)r.id(), (int)r.code(), TQString(r.data().c_str()));
         return;
     }
 
-    if (ev->type() != AskRuleEventId)
+    if ((int)ev->type() != AskRuleEventId)
         return;
 
     AskRuleEvent* askEv = static_cast<AskRuleEvent*>(ev);
@@ -449,7 +459,8 @@ void UIController::populateStats(const TQString& peer, const protocol::Statistic
 
         // Convert unixnano to datetime string
         time_t evTime = static_cast<time_t>(ev.unixnano() / 1000000000LL);
-        struct tm* tm_val = localtime(&evTime);
+        struct tm tm_buf;
+        struct tm* tm_val = localtime_r(&evTime, &tm_buf);
         char timeBuf[32];
         strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", tm_val);
 

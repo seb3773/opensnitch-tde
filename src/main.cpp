@@ -27,8 +27,13 @@
 #include "main_window.h"
 #include "nodes.h"
 #include "rules.h"
+#include "desktop_parser.h"
 
 static GRpcServer* g_server = 0;
+static SysTray* g_tray = 0;
+static UIController* g_controller = 0;
+static MainWindow* g_mainWin = 0;
+static PromptDialog* g_prompt = 0;
 TQApplication* g_app = 0;
 
 static void shutdown_runtime()
@@ -43,27 +48,38 @@ static void shutdown_runtime()
         delete g_server;
         g_server = 0;
     }
+    delete g_prompt;
+    g_prompt = 0;
+    delete g_mainWin;
+    g_mainWin = 0;
+    delete g_controller;
+    g_controller = 0;
+    delete g_tray;
+    g_tray = 0;
+
     Database::instance()->close();
     Database::destroy();
     Nodes::destroy();
     Rules::destroy();
+    DesktopParser::cleanup();
+    Config::destroy();
 }
+
+// Use volatile flag for async-signal-safety;
+// actual cleanup happens in main() after app.exec() returns.
+static volatile sig_atomic_t g_terminate = 0;
 
 static void sigint_handler(int)
 {
-    shutdown_runtime();
-    _exit(0);
+    g_terminate = 1;
+    // Post quit to the TQt event loop (async-signal-safe in practice on Linux)
+    if (g_app)
+        g_app->quit();
 }
 
 static void create_socket_dirs()
 {
-    const char* paths[] = {
-        "/tmp",
-        "/run/user",
-        NULL
-    };
-    // Ensure /tmp exists (it always does)
-    // For user-specific sockets, create the directory
+    // Ensure user-specific socket directory exists
     TQString uid;
     uid.setNum(getuid());
     TQString userDir = TQString("/run/user/%1/opensnitch").arg(uid);
@@ -72,9 +88,16 @@ static void create_socket_dirs()
 
 int main(int argc, char** argv)
 {
-    // Setup signal handlers
-    signal(SIGINT, sigint_handler);
-    signal(SIGTERM, sigint_handler);
+    // Setup signal handlers using sigaction (async-signal-safe)
+    {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = sigint_handler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = 0;
+        sigaction(SIGINT, &sa, 0);
+        sigaction(SIGTERM, &sa, 0);
+    }
 
     // Parse our custom args and strip them from argv before TDE sees them
     TQString socketAddr;
@@ -174,8 +197,8 @@ int main(int argc, char** argv)
     Rules* rules = Rules::instance();
 
     // Create system tray
-    SysTray* tray = new SysTray();
-    tray->show();
+    g_tray = new SysTray();
+    g_tray->show();
 
     if (!startBg) {
         // If tray not available, show main window after delay
@@ -183,16 +206,16 @@ int main(int argc, char** argv)
     }
 
     // Create UI controller (receives AskRule events from gRPC thread)
-    UIController* controller = new UIController();
-    app.setMainWidget(controller);
+    g_controller = new UIController();
+    app.setMainWidget(g_controller);
 
     // Create main window
-    MainWindow* mainWin = new MainWindow();
+    g_mainWin = new MainWindow();
     // daemonConnected state is set by onDaemonSubscribed when daemon connects
 
     // Create prompt dialog
-    PromptDialog* prompt = new PromptDialog();
-    controller->setPromptDialog(prompt);
+    g_prompt = new PromptDialog();
+    g_controller->setPromptDialog(g_prompt);
 
     // Start gRPC server
     g_server = new GRpcServer();
@@ -202,37 +225,37 @@ int main(int argc, char** argv)
     }
 
     // Wire gRPC server to main window for notifications
-    mainWin->setGrpcServer(g_server);
+    g_mainWin->setGrpcServer(g_server);
 
     // Wire UIController stats signal to MainWindow refresh
-    TQObject::connect(controller, SIGNAL(statsUpdated(bool, int, int, int, const TQString&)),
-                     mainWin, SLOT(onStatsUpdated(bool, int, int, int, const TQString&)));
-    TQObject::connect(controller, SIGNAL(daemonSubscribed(const TQString&, bool)),
-                     mainWin, SLOT(onDaemonSubscribed(const TQString&, bool)));
-    TQObject::connect(controller, SIGNAL(notificationReply(const TQString&, unsigned long long, int, const TQString&)),
-                     mainWin, SLOT(onNotificationReply(const TQString&, unsigned long long, int, const TQString&)));
+    TQObject::connect(g_controller, SIGNAL(statsUpdated(bool, int, int, int, const TQString&)),
+                     g_mainWin, SLOT(onStatsUpdated(bool, int, int, int, const TQString&)));
+    TQObject::connect(g_controller, SIGNAL(daemonSubscribed(const TQString&, bool)),
+                     g_mainWin, SLOT(onDaemonSubscribed(const TQString&, bool)));
+    TQObject::connect(g_controller, SIGNAL(notificationReply(const TQString&, unsigned long long, int, const TQString&)),
+                     g_mainWin, SLOT(onNotificationReply(const TQString&, unsigned long long, int, const TQString&)));
 
     // Wire UIController signals to SysTray for icon updates
-    TQObject::connect(controller, SIGNAL(daemonSubscribed(const TQString&, bool)),
-                     tray, SLOT(onDaemonSubscribed(const TQString&, bool)));
-    TQObject::connect(controller, SIGNAL(alertRequested()),
-                     tray, SLOT(setIconAlert()));
-    TQObject::connect(controller, SIGNAL(alertFinished()),
-                     tray, SLOT(restoreIcon()));
+    TQObject::connect(g_controller, SIGNAL(daemonSubscribed(const TQString&, bool)),
+                     g_tray, SLOT(onDaemonSubscribed(const TQString&, bool)));
+    TQObject::connect(g_controller, SIGNAL(alertRequested()),
+                     g_tray, SLOT(setIconAlert()));
+    TQObject::connect(g_controller, SIGNAL(alertFinished()),
+                     g_tray, SLOT(restoreIcon()));
 
     fprintf(stdout, "OpenSnitch UI running on %s\n", socketAddr.latin1());
 
     // Connect tray signals
-    TQObject::connect(tray, SIGNAL(quitRequested()), mainWin, SLOT(onQuitRequested()));
-    TQObject::connect(tray, SIGNAL(toggleMainWindow()), mainWin, SLOT(onTrayToggle()));
-    TQObject::connect(tray, SIGNAL(showMainWindow()), mainWin, SLOT(show()));
-    TQObject::connect(tray, SIGNAL(showMainWindow()), mainWin, SLOT(raise()));
-    TQObject::connect(tray, SIGNAL(enableInterception(bool)), mainWin, SLOT(onInterceptionToggled()));
+    TQObject::connect(g_tray, SIGNAL(quitRequested()), g_mainWin, SLOT(onQuitRequested()));
+    TQObject::connect(g_tray, SIGNAL(toggleMainWindow()), g_mainWin, SLOT(onTrayToggle()));
+    TQObject::connect(g_tray, SIGNAL(showMainWindow()), g_mainWin, SLOT(show()));
+    TQObject::connect(g_tray, SIGNAL(showMainWindow()), g_mainWin, SLOT(raise()));
+    TQObject::connect(g_tray, SIGNAL(enableInterception(bool)), g_mainWin, SLOT(onInterceptionToggled()));
 
-    TQObject::connect(mainWin, SIGNAL(iconsThemeChanged()), tray, SLOT(reloadIcons()));
+    TQObject::connect(g_mainWin, SIGNAL(iconsThemeChanged()), g_tray, SLOT(reloadIcons()));
 
     // Connect MainWindow interception state to SysTray icon
-    TQObject::connect(mainWin, SIGNAL(interceptionToggled(bool)), tray, SLOT(setFirewallEnabled(bool)));
+    TQObject::connect(g_mainWin, SIGNAL(interceptionToggled(bool)), g_tray, SLOT(setFirewallEnabled(bool)));
 
     int ret = app.exec();
 

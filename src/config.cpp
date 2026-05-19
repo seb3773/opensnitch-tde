@@ -3,6 +3,7 @@
 #include <tqtsettings.h>
 
 #include <stdlib.h>
+#include <unistd.h>
 
 // --- static constants ---
 const char* Config::HELP_URL          = "https://github.com/evilsocket/opensnitch/wiki/";
@@ -196,7 +197,7 @@ TQString Config::getDefaultAction()
 
 int Config::getMaxMsgLength()
 {
-    TQString val = getString("global/server_max_message_length", "4MiB");
+    TQString val = getString(KEY_SERVER_MAX_MESSAGE_LENGTH, "4MiB");
     if (val == "8MiB")  return 8388608;
     if (val == "16MiB") return 16777216;
     return 4194304; // 4MiB default
@@ -207,10 +208,27 @@ void Config::sync()
     m_settings->sync();
 }
 
+void Config::destroy()
+{
+    if (s_instance) {
+        s_instance->sync();
+        delete s_instance;
+        s_instance = 0;
+    }
+}
+
 void Config::openUrl(const TQString& url)
 {
     if (url.isEmpty())
         return;
-    TQString cmd = TQString("xdg-open '%1' &").arg(url);
-    system(cmd.latin1());
+    // Use fork/exec instead of system() to prevent shell injection
+    // via crafted URLs containing shell metacharacters.
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child: close inherited fds, exec xdg-open
+        setsid();
+        execlp("xdg-open", "xdg-open", url.local8Bit().data(), (char*)0);
+        _exit(127);
+    }
+    // Parent: don't wait — fire and forget (matches original "&" behavior)
 }

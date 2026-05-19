@@ -969,7 +969,7 @@ void PreferencesDialog::applySettings(bool doSync)
             if (!pref_apply_node_config(&outJson, origJson, act, dur, mon, intercept, lvl, saddr, slog, allowServerEdit))
                 continue;
 
-            notif.set_data(outJson.latin1());
+            notif.set_data(outJson.utf8().data());
             srv->sendNotification(addr, notif);
             Nodes::instance()->saveConfig(addr, outJson);
         }

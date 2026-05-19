@@ -437,7 +437,7 @@ protocol::Rule PromptDialog::promptUser(const protocol::Connection& conn, bool i
 
     if (!m_hasResult) {
         m_resultRule = buildRule();
-        m_resultRule.set_action(Config::get()->getDefaultAction().latin1());
+        m_resultRule.set_action(Config::get()->getDefaultAction().utf8().data());
         m_timedOut = true;
     }
 
@@ -580,13 +580,20 @@ void PromptDialog::populateFields(const protocol::Connection& conn, bool isLocal
         }
     }
 
-    // User ID with name resolution
+    // User ID with name resolution (thread-safe)
     if (isLocal) {
-        struct passwd* pw = getpwuid(conn.user_id());
-        if (pw)
-            m_valUID->setText(TQString("%1 (%2)").arg(conn.user_id()).arg(pw->pw_name));
-        else
+        struct passwd pwd;
+        struct passwd* result = 0;
+        long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+        if (bufsize < 1024) bufsize = 16384;
+        char* buf = (char*)malloc((size_t)bufsize);
+        if (buf && getpwuid_r((uid_t)conn.user_id(), &pwd, buf, (size_t)bufsize, &result) == 0
+            && result && pwd.pw_name && pwd.pw_name[0]) {
+            m_valUID->setText(TQString("%1 (%2)").arg(conn.user_id()).arg(pwd.pw_name));
+        } else {
             m_valUID->setText(TQString::number(conn.user_id()));
+        }
+        free(buf);
     } else {
         m_valUID->setText(TQString::number(conn.user_id()));
     }
@@ -620,7 +627,7 @@ protocol::Rule PromptDialog::buildRule()
     if (lastSlash >= 0)
         procName = procName.mid(lastSlash + 1);
 
-    rule.set_name(procName.latin1());
+    rule.set_name(procName.utf8().data());
     rule.set_enabled(true);
     rule.set_precedence(false);
 
@@ -667,7 +674,7 @@ protocol::Rule PromptDialog::buildRule()
         case 5: dataVal = TQString::number(m_currentConn.process_id()); break;
         default: dataVal = s2q(m_currentConn.process_path()); break;
         }
-        op->set_data(dataVal.latin1());
+        op->set_data(dataVal.utf8().data());
     } else if (targetIdx >= TARGET_COUNT) {
         // Dynamic entries (destination host patterns) - use DEST_HOST
         op->set_type(Config::RULE_TYPE_SIMPLE);
@@ -676,7 +683,7 @@ protocol::Rule PromptDialog::buildRule()
         // Extract host pattern from "to *.example.com"
         if (text.startsWith("to "))
             text = text.mid(3);
-        op->set_data(text.latin1());
+        op->set_data(text.utf8().data());
     } else {
         op->set_type(Config::RULE_TYPE_SIMPLE);
         op->set_operand(Config::OPERAND_PROCESS_PATH);
@@ -720,7 +727,7 @@ protocol::Rule PromptDialog::buildRule()
         append_list_json(&json, baseType.latin1(), baseOperand.latin1(), baseData);
         json += "]";
 
-        op->set_data(json.latin1());
+        op->set_data(json.utf8().data());
         op->set_type(Config::RULE_TYPE_LIST);
         op->set_operand(Config::RULE_TYPE_LIST);
     }
@@ -792,7 +799,7 @@ void PromptDialog::closeEvent(TQCloseEvent* e)
 {
     if (!m_hasResult) {
         m_resultRule = buildRule();
-        m_resultRule.set_action(Config::get()->getDefaultAction().latin1());
+        m_resultRule.set_action(Config::get()->getDefaultAction().utf8().data());
         m_hasResult = true;
     }
     m_tickTimer->stop();

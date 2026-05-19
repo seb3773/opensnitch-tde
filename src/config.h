@@ -158,6 +158,7 @@ public:
     static void openUrl(const TQString& url);
 
     void sync();
+    static void destroy();
 
 private:
     Config();

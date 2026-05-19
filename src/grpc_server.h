@@ -10,6 +10,7 @@
 #include <grpcpp/alarm.h>
 
 #include <pthread.h>
+#include <atomic>
 
 #include "ui.grpc.pb.h"
 
@@ -34,12 +35,14 @@ struct RpcTag {
     void* call;  // pointer to the call data
 };
 
-// Custom event type for posting AskRule requests to the GUI thread
-// Event ID: 1000+ to avoid collision with TQt system events
-static const int AskRuleEventId = 1000;
-static const int PingStatsEventId = 1001;
-static const int SubscribeEventId = 1002;
-static const int NotificationReplyEventId = 1003;
+// Custom event type IDs for posting events to the GUI thread.
+// Using enum to avoid ODR issues from static const in headers.
+enum {
+    AskRuleEventId            = 1000,
+    PingStatsEventId          = 1001,
+    SubscribeEventId          = 1002,
+    NotificationReplyEventId  = 1003
+};
 
 class AskRuleEvent : public TQCustomEvent {
 public:
@@ -148,11 +151,11 @@ private:
     RpcTag m_tagDone;
     enum { CREATE, PROCESS, WAITING, FINISH } m_state;
 
-    int m_finishCompleted;
-    int m_doneNotified;
+    std::atomic<int> m_finishCompleted;
+    std::atomic<int> m_doneNotified;
 
-    int m_finishStarted;
-    int m_guiHolding;
+    std::atomic<int> m_finishStarted;
+    std::atomic<int> m_guiHolding;
 };
 
 // --- Subscribe RPC ---
@@ -211,7 +214,7 @@ private:
 };
 
 // --- The gRPC server ---
-class GRpcServer : public TQObject
+class GRpcServer
 {
 public:
     GRpcServer();
@@ -253,6 +256,7 @@ private:
     pthread_t m_cqThread;
     pthread_t m_notifyCqThread;
     bool m_running;
+    bool m_threadsStarted;
 
     // Active notification streams (one per connected daemon)
     mutable pthread_mutex_t m_notifsLock;

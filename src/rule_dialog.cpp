@@ -242,7 +242,7 @@ void RuleDialog::onApplyClicked()
     TQString dur = (m_durationCombo ? m_durationCombo->currentText() : TQString("once"));
     dur = dur.stripWhiteSpace();
     if (dur.isEmpty()) dur = "once";
-    baseRule.set_duration(dur.latin1());
+    baseRule.set_duration(dur.utf8().data());
 
     // Operators: match Python Debian RulesEditor behavior.
     // - Collect all selected fields into a list.
@@ -442,9 +442,9 @@ void RuleDialog::onApplyClicked()
     }
 
     protocol::Operator* op = baseRule.mutable_operator_();
-    op->set_operand(opOperand.latin1());
-    op->set_data(opData.latin1());
-    op->set_type(opType.latin1());
+    op->set_operand(opOperand.utf8().data());
+    op->set_data(opData.utf8().data());
+    op->set_type(opType.utf8().data());
     op->set_sensitive((opItems.count() >= 2) ? false : (sensitive ? true : false));
 
     // Name: match Python Debian RulesEditor: slugify("<action> <operator.type> <operator.data>")
@@ -476,7 +476,7 @@ void RuleDialog::onApplyClicked()
         if (m_nameEdit)
             m_nameEdit->setText(name);
     }
-    baseRule.set_name(name.latin1());
+    baseRule.set_name(name.utf8().data());
 
     // Node targets
     TQStringList targets;

@@ -31,7 +31,7 @@ struct NetIdentity
     }
 };
 
-static const int NetIdentityResolvedEventId = 1005; // custom event id, must not collide
+enum { NetIdentityResolvedEventId = 1005 }; // custom event id, must not collide
 
 class NetIdentityResolvedEvent : public TQCustomEvent
 {

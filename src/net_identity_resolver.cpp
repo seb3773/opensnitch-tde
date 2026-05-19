@@ -252,7 +252,10 @@ NetIdentityResolver::NetIdentityResolver()
 
 NetIdentityResolver::~NetIdentityResolver()
 {
-    // Let the thread finish naturally.
+    // Wait for the resolver thread to finish before deleting.
+    // getnameinfo() can block for seconds, so use a reasonable timeout.
+    if (m_thread && m_thread->running())
+        m_thread->wait(5000);
     delete m_thread;
     m_thread = 0;
 }

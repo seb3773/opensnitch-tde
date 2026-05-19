@@ -24,6 +24,21 @@ public:
 
     void setPromptDialog(PromptDialog* dlg) { m_promptDialog = dlg; }
 
+    // Clear dedup caches for a specific node address (call on disconnect)
+    // or all caches if addr is empty. Prevents unbounded memory growth.
+    void clearDedupCache(const TQString& addr = TQString()) {
+        if (addr.isEmpty()) {
+            m_lastStats.clear();
+            m_lastItems.clear();
+        } else {
+            m_lastStats.remove(addr);
+            // Remove this addr from all detail tables
+            for (TQMap<TQString, TQMap<TQString, TQMap<TQString, uint64_t> > >::Iterator it = m_lastItems.begin();
+                 it != m_lastItems.end(); ++it)
+                it.data().remove(addr);
+        }
+    }
+
 signals:
     void statsUpdated(bool needRefresh, int connections, int dropped, int rules, const TQString& uptime);
     void daemonSubscribed(const TQString& peer, bool firewallRunning);

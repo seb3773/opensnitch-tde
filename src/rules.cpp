@@ -145,17 +145,17 @@ Rules::RuleRecord* Rules::get(const TQString& name, const TQString& node)
 protocol::Rule Rules::toProtobuf(const RuleRecord& r)
 {
     protocol::Rule rule;
-    rule.set_name(r.name.latin1());
+    rule.set_name(r.name.utf8().data());
     rule.set_enabled(r.enabled);
     rule.set_precedence(r.precedence);
-    rule.set_action(r.action.latin1());
-    rule.set_duration(r.duration.latin1());
+    rule.set_action(r.action.utf8().data());
+    rule.set_duration(r.duration.utf8().data());
 
     protocol::Operator* op = rule.mutable_operator_();
-    op->set_type(r.opType.latin1());
+    op->set_type(r.opType.utf8().data());
     op->set_sensitive(r.opSensitive);
-    op->set_operand(r.opOperand.latin1());
-    op->set_data(r.opData.latin1());
+    op->set_operand(r.opOperand.utf8().data());
+    op->set_data(r.opData.utf8().data());
 
     return rule;
 }

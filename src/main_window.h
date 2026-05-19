@@ -290,8 +290,6 @@ private:
 
     class ProcessDetailsDialog* m_procDetailsDlg;
 
-    // Other generic tabs (legacy)
-    TQTable*      m_usersTable;
 
     // Filter bar
     TQFrame*      m_filterBar;

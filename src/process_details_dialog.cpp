@@ -402,7 +402,7 @@ void ProcessDetailsDialog::startMonitoring()
     protocol::Notification notif;
     notif.set_id((unsigned long long)time(0));
     notif.set_type(protocol::MONITOR_PROCESS);
-    notif.set_data(m_pid.latin1());
+    notif.set_data(m_pid.utf8().data());
     m_lastNid = notif.id();
     m_notificationsSent.insert(m_lastNid, (int)protocol::MONITOR_PROCESS);
     m_server->sendNotification(m_node, notif);
@@ -420,7 +420,7 @@ void ProcessDetailsDialog::stopMonitoring()
     protocol::Notification notif;
     notif.set_id((unsigned long long)time(0));
     notif.set_type(protocol::STOP_MONITOR_PROCESS);
-    notif.set_data(m_pid.latin1());
+    notif.set_data(m_pid.utf8().data());
     m_lastNid = notif.id();
     m_notificationsSent.insert(m_lastNid, (int)protocol::STOP_MONITOR_PROCESS);
     m_server->sendNotification(m_node, notif);

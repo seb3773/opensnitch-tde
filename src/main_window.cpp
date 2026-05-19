@@ -11,7 +11,6 @@
 #include <ntqpopupmenu.h>
 #include <ntqtoolbutton.h>
 #include <ntqlabel.h>
-#include <ntqhbox.h>
 #include <ntqfiledialog.h>
 #include <ntqfile.h>
 #include <ntqtextstream.h>
@@ -25,13 +24,13 @@
 #include <ntqwhatsthis.h>
 #include <ntqimage.h>
 #include <ntqiconset.h>
- #include <ntqfontmetrics.h>
+#include <ntqfontmetrics.h>
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
- #include <pwd.h>
- #include <sys/types.h>
- #include <stdlib.h>
+#include <pwd.h>
+#include <sys/types.h>
+#include <stdlib.h>
 
 #include <ntqsplitter.h>
 
@@ -209,7 +208,7 @@ void MainWindow::customEvent(TQCustomEvent* ev)
     if (!ev)
         return;
 
-    if (ev->type() == NetIdentityResolvedEventId) {
+    if ((int)ev->type() == NetIdentityResolvedEventId) {
         NetIdentityResolvedEvent* ne = static_cast<NetIdentityResolvedEvent*>(ev);
         updateAddrNetworkNameRow(ne->ip(), ne->hostname(), ne->provider());
         return;
@@ -541,7 +540,7 @@ void MainWindow::ensureInternalDnsRule(const TQString& node)
         return;
 
     protocol::Rule r;
-    r.set_name(name.latin1());
+    r.set_name(name.utf8().data());
     r.set_enabled(true);
     r.set_precedence(false);
     r.set_action(Config::ACTION_ALLOW);
@@ -550,7 +549,7 @@ void MainWindow::ensureInternalDnsRule(const TQString& node)
     protocol::Operator* op = r.mutable_operator_();
     op->set_type(Config::RULE_TYPE_SIMPLE);
     op->set_operand(Config::OPERAND_PROCESS_PATH);
-    op->set_data(exe.latin1());
+    op->set_data(exe.utf8().data());
     op->set_sensitive(false);
 
     const TQString now = TQDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
@@ -587,7 +586,7 @@ void MainWindow::removeInternalDnsRule()
         notif.set_type(protocol::DELETE_RULE);
         protocol::Rule* r = notif.add_rules();
         if (r)
-            r->set_name(name.latin1());
+            r->set_name(name.utf8().data());
         m_server->broadcastNotification(notif);
     }
     Rules::instance()->remove(name, node);
@@ -1557,16 +1556,16 @@ void MainWindow::onRuleDetailEditClicked()
         return;
 
     protocol::Rule r;
-    r.set_name(m_rulesDetailName.latin1());
+    r.set_name(m_rulesDetailName.utf8().data());
     r.set_enabled(q.value(3).toString() == "True");
     r.set_precedence(q.value(4).toString() == "True");
-    r.set_action(q.value(5).toString().latin1());
-    r.set_duration(q.value(6).toString().latin1());
+    r.set_action(q.value(5).toString().utf8().data());
+    r.set_duration(q.value(6).toString().utf8().data());
     protocol::Operator* op = r.mutable_operator_();
-    op->set_type(q.value(7).toString().latin1());
+    op->set_type(q.value(7).toString().utf8().data());
     op->set_sensitive(q.value(8).toString() == "True");
-    op->set_operand(q.value(9).toString().latin1());
-    op->set_data(q.value(10).toString().latin1());
+    op->set_operand(q.value(9).toString().utf8().data());
+    op->set_data(q.value(10).toString().utf8().data());
 
     if (!m_ruleDlg)
         m_ruleDlg = new RuleDialog(this);
@@ -1594,7 +1593,7 @@ void MainWindow::onRuleDetailDeleteClicked()
         notif.set_type(protocol::DELETE_RULE);
         protocol::Rule* rr = notif.add_rules();
         if (rr)
-            rr->set_name(m_rulesDetailName.latin1());
+            rr->set_name(m_rulesDetailName.utf8().data());
         m_server->sendNotification(m_rulesDetailNode, notif);
     }
 
@@ -1768,16 +1767,16 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
             return;
 
         protocol::Rule r;
-        r.set_name(ruleName.latin1());
+        r.set_name(ruleName.utf8().data());
         r.set_enabled(q.value(3).toString() == "True");
         r.set_precedence(q.value(4).toString() == "True");
-        r.set_action(q.value(5).toString().latin1());
-        r.set_duration(q.value(6).toString().latin1());
+        r.set_action(q.value(5).toString().utf8().data());
+        r.set_duration(q.value(6).toString().utf8().data());
         protocol::Operator* op = r.mutable_operator_();
-        op->set_type(q.value(7).toString().latin1());
+        op->set_type(q.value(7).toString().utf8().data());
         op->set_sensitive(q.value(8).toString() == "True");
-        op->set_operand(q.value(9).toString().latin1());
-        op->set_data(q.value(10).toString().latin1());
+        op->set_operand(q.value(9).toString().utf8().data());
+        op->set_data(q.value(10).toString().utf8().data());
 
         // Send and also insert into local DB (like Python)
         if (m_server) {
@@ -1812,16 +1811,16 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
             return;
 
         protocol::Rule r;
-        r.set_name(ruleName.latin1());
+        r.set_name(ruleName.utf8().data());
         r.set_enabled(q.value(3).toString() == "True");
         r.set_precedence(q.value(4).toString() == "True");
-        r.set_action(q.value(5).toString().latin1());
-        r.set_duration(q.value(6).toString().latin1());
+        r.set_action(q.value(5).toString().utf8().data());
+        r.set_duration(q.value(6).toString().utf8().data());
         protocol::Operator* op = r.mutable_operator_();
-        op->set_type(q.value(7).toString().latin1());
+        op->set_type(q.value(7).toString().utf8().data());
         op->set_sensitive(q.value(8).toString() == "True");
-        op->set_operand(q.value(9).toString().latin1());
-        op->set_data(q.value(10).toString().latin1());
+        op->set_operand(q.value(9).toString().utf8().data());
+        op->set_data(q.value(10).toString().utf8().data());
 
         // Sync local Rules store (DB insert is REPLACE due to UNIQUE(node,name)).
         Rules::instance()->add(TQDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), node, r);
@@ -1845,7 +1844,7 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
             notif.set_type(protocol::DELETE_RULE);
             protocol::Rule* r = notif.add_rules();
             if (r) {
-                r->set_name(ruleName.latin1());
+                r->set_name(ruleName.utf8().data());
                 r->set_enabled(false);
                 r->set_action("");
                 r->set_duration("");
@@ -1867,7 +1866,7 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
             notif.set_type(wantEnabled ? protocol::ENABLE_RULE : protocol::DISABLE_RULE);
             protocol::Rule* rr = notif.add_rules();
             if (rr)
-                rr->set_name(ruleName.latin1());
+                rr->set_name(ruleName.utf8().data());
             m_server->sendNotification(node, notif);
         }
         return;
@@ -1886,13 +1885,13 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
         protocol::Rule r;
         r.set_enabled(q.value(3).toString() == "True");
         r.set_precedence(q.value(4).toString() == "True");
-        r.set_action(q.value(5).toString().latin1());
-        r.set_duration(q.value(6).toString().latin1());
+        r.set_action(q.value(5).toString().utf8().data());
+        r.set_duration(q.value(6).toString().utf8().data());
         protocol::Operator* op = r.mutable_operator_();
-        op->set_type(q.value(7).toString().latin1());
+        op->set_type(q.value(7).toString().utf8().data());
         op->set_sensitive(q.value(8).toString() == "True");
-        op->set_operand(q.value(9).toString().latin1());
-        op->set_data(q.value(10).toString().latin1());
+        op->set_operand(q.value(9).toString().utf8().data());
+        op->set_data(q.value(10).toString().utf8().data());
 
         TQString newName;
         for (int i = 0; i < 100; ++i) {
@@ -1906,7 +1905,7 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
         }
         if (newName.isEmpty())
             return;
-        r.set_name(newName.latin1());
+        r.set_name(newName.utf8().data());
 
         Rules::instance()->add(TQDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), node, r);
         if (m_server) {
@@ -1932,16 +1931,16 @@ void MainWindow::onRulesContextMenu(int modelRow, int, const TQPoint& globalPos)
             return;
 
         protocol::Rule r;
-        r.set_name(ruleName.latin1());
+        r.set_name(ruleName.utf8().data());
         r.set_enabled(q.value(3).toString() == "True");
         r.set_precedence(q.value(4).toString() == "True");
-        r.set_action(q.value(5).toString().latin1());
-        r.set_duration(q.value(6).toString().latin1());
+        r.set_action(q.value(5).toString().utf8().data());
+        r.set_duration(q.value(6).toString().utf8().data());
         protocol::Operator* op = r.mutable_operator_();
-        op->set_type(q.value(7).toString().latin1());
+        op->set_type(q.value(7).toString().utf8().data());
         op->set_sensitive(q.value(8).toString() == "True");
-        op->set_operand(q.value(9).toString().latin1());
-        op->set_data(q.value(10).toString().latin1());
+        op->set_operand(q.value(9).toString().utf8().data());
+        op->set_data(q.value(10).toString().utf8().data());
 
         if (!m_ruleDlg)
             m_ruleDlg = new RuleDialog(this);
@@ -3775,7 +3774,7 @@ void MainWindow::onDeleteRuleClicked()
             notif.set_type(protocol::DELETE_RULE);
             protocol::Rule* r = notif.add_rules();
             if (r) {
-                r->set_name(name.latin1());
+                r->set_name(name.utf8().data());
             }
             m_server->sendNotification(node, notif);
         }
@@ -3805,7 +3804,7 @@ void MainWindow::onToggleRuleClicked()
             notif.set_type(wantEnabled ? protocol::ENABLE_RULE : protocol::DISABLE_RULE);
             protocol::Rule* rr = notif.add_rules();
             if (rr)
-                rr->set_name(name.latin1());
+                rr->set_name(name.utf8().data());
             m_server->sendNotification(node, notif);
         }
 
