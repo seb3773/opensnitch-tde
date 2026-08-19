@@ -30,13 +30,11 @@ Database::Database()
       m_dbFile("file::memory:?cache=shared"),
       m_dbType(0)
 {
-    pthread_mutex_init(&m_lock, 0);
 }
 
 Database::~Database()
 {
     close();
-    pthread_mutex_destroy(&m_lock);
 }
 
 bool Database::initialize(int dbtype, const TQString& dbfile, bool jrnl_wal)
@@ -103,11 +101,9 @@ bool Database::initialize(int dbtype, const TQString& dbfile, bool jrnl_wal)
 
 void Database::close()
 {
-    pthread_mutex_lock(&m_lock);
     if (m_db && m_db->isOpen())
         m_db->close();
     m_db = 0;
-    pthread_mutex_unlock(&m_lock);
 }
 
 TQSqlDatabase* Database::sqlDatabase()
@@ -118,13 +114,11 @@ TQSqlDatabase* Database::sqlDatabase()
 bool Database::exec(const TQString& sql)
 {
     if (!m_db) return false;
-    pthread_mutex_lock(&m_lock);
     TQSqlQuery q(m_db);
     bool ok = q.exec(sql);
     if (!ok)
         fprintf(stderr, "DB exec error: %s -> %s\n", sql.local8Bit().data(),
                 q.lastError().text().local8Bit().data());
-    pthread_mutex_unlock(&m_lock);
     return ok;
 }
 
@@ -143,7 +137,6 @@ bool Database::insert(const TQString& table, const TQString& columns,
         ph << "?";
     sql += ph.join(",") + ")";
 
-    pthread_mutex_lock(&m_lock);
     TQSqlQuery q(m_db);
     q.prepare(sql);
     for (unsigned i = 0; i < values.count(); i++)
@@ -152,7 +145,6 @@ bool Database::insert(const TQString& table, const TQString& columns,
     if (!ok)
         fprintf(stderr, "DB insert error: %s -> %s\n", sql.local8Bit().data(),
                 q.lastError().text().local8Bit().data());
-    pthread_mutex_unlock(&m_lock);
     return ok;
 }
 
@@ -162,7 +154,6 @@ bool Database::insertBatch(const TQString& table, const TQString& colnames,
     if (!m_db) return false;
     TQString sql = TQString("INSERT OR REPLACE INTO %1 %2 VALUES (?, ?)").arg(table).arg(colnames);
 
-    pthread_mutex_lock(&m_lock);
     TQSqlQuery q(m_db);
     q.prepare(sql);
 
@@ -172,11 +163,9 @@ bool Database::insertBatch(const TQString& table, const TQString& colnames,
         q.bindValue(1, values[i]);
         if (!q.exec()) {
             fprintf(stderr, "DB insertBatch error: %s\n", q.lastError().text().local8Bit().data());
-            pthread_mutex_unlock(&m_lock);
             return false;
         }
     }
-    pthread_mutex_unlock(&m_lock);
     return true;
 }
 
@@ -186,7 +175,6 @@ bool Database::update(const TQString& table, const TQString& setClause,
     if (!m_db) return false;
     TQString sql = TQString("UPDATE %1 SET %2 WHERE %3").arg(table).arg(setClause).arg(whereClause);
 
-    pthread_mutex_lock(&m_lock);
     TQSqlQuery q(m_db);
     q.prepare(sql);
     for (unsigned i = 0; i < values.count(); i++)
@@ -195,7 +183,6 @@ bool Database::update(const TQString& table, const TQString& setClause,
     if (!ok)
         fprintf(stderr, "DB update error: %s -> %s\n", sql.local8Bit().data(),
                 q.lastError().text().local8Bit().data());
-    pthread_mutex_unlock(&m_lock);
     return ok;
 }
 
@@ -205,7 +192,6 @@ bool Database::deleteRows(const TQString& table, const TQString& whereClause,
     if (!m_db) return false;
     TQString sql = TQString("DELETE FROM %1 WHERE %2").arg(table).arg(whereClause);
 
-    pthread_mutex_lock(&m_lock);
     TQSqlQuery q(m_db);
     q.prepare(sql);
     for (unsigned i = 0; i < values.count(); i++)
@@ -214,20 +200,17 @@ bool Database::deleteRows(const TQString& table, const TQString& whereClause,
     if (!ok)
         fprintf(stderr, "DB delete error: %s -> %s\n", sql.local8Bit().data(),
                 q.lastError().text().local8Bit().data());
-    pthread_mutex_unlock(&m_lock);
     return ok;
 }
 
 TQSqlQuery Database::query(const TQString& sql, const TQValueList<TQVariant>& binds)
 {
     if (!m_db) return TQSqlQuery();
-    pthread_mutex_lock(&m_lock);
     TQSqlQuery q(m_db);
     q.prepare(sql);
     for (unsigned i = 0; i < binds.count(); i++)
         q.bindValue(i, binds[i]);
     q.exec();
-    pthread_mutex_unlock(&m_lock);
     return q;
 }
 
@@ -235,7 +218,6 @@ TQSqlCursor* Database::select(const TQString& table, const TQString& /*fields*/,
                                const TQString& where, const TQString& orderBy, int /*limit*/)
 {
     if (!m_db) return 0;
-    pthread_mutex_lock(&m_lock);
     TQSqlCursor* cur = new TQSqlCursor(table, true, m_db);
     cur->setMode(TQSqlCursor::ReadOnly);
     // TQt3: select(filter, sort) where filter is SQL WHERE clause, sort is TQSqlIndex
@@ -277,7 +259,6 @@ TQSqlCursor* Database::select(const TQString& table, const TQString& /*fields*/,
         else
             cur->select();
     }
-    pthread_mutex_unlock(&m_lock);
     return cur;
 }
 

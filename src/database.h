@@ -8,12 +8,11 @@
 #include <ntqstringlist.h>
 #include <ntqvaluelist.h>
 #include <ntqmap.h>
-#include <pthread.h>
 
 // Complexity: O(1) for single inserts, O(n) for batch
 // Dependencies: TQSql, QSQLITE3 driver
 // Alignment: none required
-// Thread safety: mutex-protected
+// Thread safety: Single-threaded (GUI thread only)
 
 class Database {
 public:
@@ -60,7 +59,6 @@ private:
     TQString m_dbName;
     TQString m_dbFile;
     int m_dbType;
-    pthread_mutex_t m_lock;
 
     bool createTables();
     bool upgradeSchema();

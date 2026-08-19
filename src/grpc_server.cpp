@@ -233,19 +233,12 @@ void SubscribeCallData::proceed(bool ok, RpcTag::Type)
         // Register the node and post event to GUI thread
         {
             TQString peer = TQString(m_ctx.peer().c_str());
-            Nodes::instance()->add(peer, m_request);
 
-            // Also import rules from this node config so the Rules tab shows them.
-            // Normalize peer address to "proto:addr" (matches UIController).
-            TQString proto, addr;
-            Nodes::splitPeer(peer, proto, addr);
-            const TQString nodeAddr = proto + ":" + addr;
-            Rules::instance()->addRules(nodeAddr, m_request.rules());
-
-            // Post subscribe event to GUI thread with firewall state
+            // Post subscribe event to GUI thread with full request payload.
+            // This safely moves Nodes and Rules map insertions to the GUI thread.
             if (g_app && g_app->mainWidget())
                 TQApplication::postEvent(g_app->mainWidget(),
-                    new SubscribeEvent(peer, m_request.isfirewallrunning()));
+                    new SubscribeEvent(peer, m_request));
 
             // Overwrite DefaultAction in the config before replying
             protocol::ClientConfig reply = m_request;
@@ -513,7 +506,7 @@ void* GRpcServer::cqThreadFunc(void* arg)
     void* tag;
     bool ok = false;
 
-    while (self->m_running && self->m_cq->Next(&tag, &ok)) {
+    while (self->m_cq->Next(&tag, &ok)) {
         RpcTag* rpcTag = static_cast<RpcTag*>(tag);
         CallData* call = static_cast<CallData*>(rpcTag->call);
         call->proceed(ok, rpcTag->type);
@@ -528,7 +521,7 @@ void* GRpcServer::notifyCqThreadFunc(void* arg)
     void* tag;
     bool ok = false;
 
-    while (self->m_running && self->m_notifyCq->Next(&tag, &ok)) {
+    while (self->m_notifyCq->Next(&tag, &ok)) {
         RpcTag* rpcTag = static_cast<RpcTag*>(tag);
         CallData* call = static_cast<CallData*>(rpcTag->call);
         call->proceed(ok, rpcTag->type);

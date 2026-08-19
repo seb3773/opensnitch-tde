@@ -12,6 +12,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+static inline unsigned long long queryPragmaU64(Database* db, const char* pragma)
+{
+    if (!db || !pragma)
+        return 0;
+    TQSqlQuery q = db->query(TQString("PRAGMA %1").arg(pragma));
+    if (q.next())
+        return (unsigned long long)q.value(0).toULongLong();
+    return 0;
+}
+
 static inline void purgeOldConnectionsIfNeeded(Database* db)
 {
     if (!db || !db->isOpen())
@@ -26,33 +36,87 @@ static inline void purgeOldConnectionsIfNeeded(Database* db)
     if (dbType != (int)Config::DB_TYPE_MEMORY)
         return;
 
-    if (!cfg->getBool(Config::KEY_DB_PURGE_OLDEST, false))
-        return;
+    // 1. Time-based purge
+    if (cfg->getBool(Config::KEY_DB_PURGE_OLDEST, false)) {
+        int maxDays = cfg->getInt(Config::KEY_DB_MAX_DAYS, 1);
+        if (maxDays > 0) {
+            int intervalMin = cfg->getInt(Config::KEY_DB_PURGE_INTERVAL, 5);
+            if (intervalMin <= 0)
+                intervalMin = 1;
 
-    int maxDays = cfg->getInt(Config::KEY_DB_MAX_DAYS, 1);
-    if (maxDays <= 0)
-        return;
+            static time_t s_lastPurge = 0;
+            time_t now = time(0);
+            bool execute = false;
+            if (s_lastPurge == 0) {
+                execute = true;
+            } else {
+                const time_t minDelta = (time_t)intervalMin * 60;
+                if (now - s_lastPurge >= minDelta)
+                    execute = true;
+            }
 
-    int intervalMin = cfg->getInt(Config::KEY_DB_PURGE_INTERVAL, 5);
-    if (intervalMin <= 0)
-        intervalMin = 1;
+            if (execute) {
+                s_lastPurge = now;
+                // time column is stored as "YYYY-MM-DD HH:MM:SS".
+                // SQLite datetime('now', ...) uses the same canonical format.
+                db->exec(TQString("DELETE FROM connections WHERE time < datetime('now','-%1 days')")
+                             .arg(maxDays));
 
-    static time_t s_lastPurge = 0;
-    time_t now = time(0);
-    if (s_lastPurge != 0) {
-        const time_t minDelta = (time_t)intervalMin * 60;
-        if (now - s_lastPurge < minDelta)
-            return;
+                // Free pages inside SQLite (may not return memory to OS, but prevents growth).
+                db->exec("PRAGMA shrink_memory");
+            }
+        }
     }
-    s_lastPurge = now;
 
-    // time column is stored as "YYYY-MM-DD HH:MM:SS".
-    // SQLite datetime('now', ...) uses the same canonical format.
-    db->exec(TQString("DELETE FROM connections WHERE time < datetime('now','-%1 days')")
-                 .arg(maxDays));
+    // 2. RAM-limit-based purge
+    if (cfg->getBool(Config::KEY_DB_RAM_LIMIT_ENABLE, false)) {
+        int ramLimitMb = cfg->getInt(Config::KEY_DB_RAM_LIMIT, 50);
+        if (ramLimitMb > 0) {
+            int intervalMin = cfg->getInt(Config::KEY_DB_RAM_PURGE_INTERVAL, 5);
+            if (intervalMin <= 0)
+                intervalMin = 1;
 
-    // Free pages inside SQLite (may not return memory to OS, but prevents growth).
-    db->exec("PRAGMA shrink_memory");
+            static time_t s_lastRamPurge = 0;
+            time_t now = time(0);
+            bool execute = false;
+            if (s_lastRamPurge == 0) {
+                execute = true;
+            } else {
+                const time_t minDelta = (time_t)intervalMin * 60;
+                if (now - s_lastRamPurge >= minDelta)
+                    execute = true;
+            }
+
+            if (execute) {
+                s_lastRamPurge = now;
+                unsigned long long pageCount = queryPragmaU64(db, "page_count");
+                unsigned long long pageSize  = queryPragmaU64(db, "page_size");
+                unsigned long long currentBytes = pageCount * pageSize;
+                unsigned long long ramLimitBytes = (unsigned long long)ramLimitMb * 1024ULL * 1024ULL;
+
+                if (currentBytes > ramLimitBytes) {
+                    TQSqlQuery qCount = db->query("SELECT COUNT(*) FROM connections");
+                    unsigned long long rowCount = 0;
+                    if (qCount.next()) {
+                        rowCount = qCount.value(0).toULongLong();
+                    }
+
+                    if (rowCount > 0) {
+                        unsigned long long toDelete = rowCount / 5;
+                        if (toDelete == 0)
+                            toDelete = 100;
+                        if (toDelete > rowCount)
+                            toDelete = rowCount;
+
+                        db->exec(TQString("DELETE FROM connections WHERE rowid IN (SELECT rowid FROM connections ORDER BY time ASC LIMIT %1)")
+                                     .arg(toDelete));
+
+                        db->exec("PRAGMA shrink_memory");
+                    }
+                }
+            }
+        }
+    }
 }
 
 static inline TQString s2q(const std::string& s) { return TQString(s.c_str()); }
@@ -268,7 +332,17 @@ void UIController::customEvent(TQCustomEvent* ev)
 
     if ((int)ev->type() == SubscribeEventId) {
         SubscribeEvent* se = static_cast<SubscribeEvent*>(ev);
-        emit daemonSubscribed(se->peer(), se->firewallRunning());
+        TQString peer = se->peer();
+        protocol::ClientConfig req = se->request();
+        
+        Nodes::instance()->add(peer, req);
+        
+        TQString proto, addr;
+        Nodes::splitPeer(peer, proto, addr);
+        const TQString nodeAddr = proto + ":" + addr;
+        Rules::instance()->addRules(nodeAddr, req.rules());
+        
+        emit daemonSubscribed(peer, req.isfirewallrunning());
         return;
     }
 

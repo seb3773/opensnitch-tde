@@ -70,15 +70,15 @@ private:
 
 class SubscribeEvent : public TQCustomEvent {
 public:
-    SubscribeEvent(const TQString& peer, bool firewallRunning)
-        : TQCustomEvent(SubscribeEventId), m_peer(peer), m_firewallRunning(firewallRunning) {}
+    SubscribeEvent(const TQString& peer, const protocol::ClientConfig& request)
+        : TQCustomEvent(SubscribeEventId), m_peer(peer), m_request(request) {}
 
     TQString peer() const { return m_peer; }
-    bool firewallRunning() const { return m_firewallRunning; }
+    const protocol::ClientConfig& request() const { return m_request; }
 
 private:
     TQString m_peer;
-    bool m_firewallRunning;
+    protocol::ClientConfig m_request;
 };
 
 class NotificationReplyEvent : public TQCustomEvent {

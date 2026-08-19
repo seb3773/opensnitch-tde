@@ -64,7 +64,7 @@ static inline unsigned long long queryPragmaU64(Database* db, const char* pragma
     return 0;
 }
 
-static inline TQString db_mem_usage_html()
+static inline TQString db_mem_usage_html(bool overrideLimit = false, unsigned long long limitBytes = 0)
 {
     Database* db = Database::instance();
     if (!db || !db->isOpen())
@@ -78,7 +78,8 @@ static inline TQString db_mem_usage_html()
 
     unsigned long long usedPages = (pageCount > freeList) ? (pageCount - freeList) : pageCount;
     unsigned long long usedBytes = usedPages * pageSize;
-    unsigned long long totalBytes = pageCount * pageSize;
+    unsigned long long totalBytes = overrideLimit ? limitBytes : (pageCount * pageSize);
+
     return TQString("<b>Current RAM usage:</b> %1 / %2")
         .arg(fmtBytes(usedBytes))
         .arg(fmtBytes(totalBytes));
@@ -239,6 +240,10 @@ PreferencesDialog::PreferencesDialog(MainWindow* mainWin, TQWidget* parent, cons
       m_dbPurgeEnable(0),
       m_dbMaxDays(0),
       m_dbPurgeInterval(0),
+      m_dbLowResLabel(0),
+      m_dbRamLimitEnable(0),
+      m_dbRamLimit(0),
+      m_dbRamPurgeInterval(0),
       m_btnClose(0),
       m_btnApply(0),
       m_btnSave(0)
@@ -609,11 +614,40 @@ void PreferencesDialog::setupUi()
         gl->addWidget(new TQLabel("minutes", tab), 1, 2);
 
         lay->addLayout(gl);
+
+        // Low resources section
+        m_dbLowResLabel = new TQLabel("<i>For low resources systems</i>", tab);
+        m_dbLowResLabel->setTextFormat(TQt::RichText);
+        lay->addWidget(m_dbLowResLabel);
+
+        m_dbRamLimitEnable = new TQCheckBox("Maximum RAM to use", tab);
+        lay->addWidget(m_dbRamLimitEnable);
+
+        TQGridLayout* gl2 = new TQGridLayout(2, 3, 8);
+        gl2->addWidget(new TQLabel("RAM limit", tab), 0, 0);
+        m_dbRamLimit = new TQComboBox(tab);
+        m_dbRamLimit->insertItem("20MB");
+        m_dbRamLimit->insertItem("50MB");
+        m_dbRamLimit->insertItem("75MB");
+        m_dbRamLimit->insertItem("100MB");
+        m_dbRamLimit->insertItem("150MB");
+        gl2->addWidget(m_dbRamLimit, 0, 1);
+        gl2->addWidget(new TQLabel("", tab), 0, 2);
+
+        gl2->addWidget(new TQLabel("Minutes between events purges", tab), 1, 0);
+        m_dbRamPurgeInterval = new TQSpinBox(1, 999999, 1, tab);
+        gl2->addWidget(m_dbRamPurgeInterval, 1, 1);
+        gl2->addWidget(new TQLabel("minutes", tab), 1, 2);
+
+        lay->addLayout(gl2);
+
         lay->addStretch(1);
         m_tabs->addTab(tab, "Database");
 
         connect(m_dbType, SIGNAL(activated(int)), this, SLOT(onDbTypeChanged(int)));
         connect(m_dbPurgeEnable, SIGNAL(toggled(bool)), this, SLOT(onDbPurgeToggled(bool)));
+        connect(m_dbRamLimitEnable, SIGNAL(toggled(bool)), this, SLOT(onDbRamLimitToggled(bool)));
+        connect(m_dbRamLimit, SIGNAL(activated(int)), this, SLOT(updateDbTabStates()));
     }
 
     // Server / gRPC
@@ -785,8 +819,26 @@ void PreferencesDialog::loadSettings()
     }
     m_dbPurgeInterval->setValue(purgeInterval);
 
-    onDbTypeChanged(m_dbType->currentItem());
-    onDbPurgeToggled(purge);
+    bool ramLimitEnable = cfg->getBool(Config::KEY_DB_RAM_LIMIT_ENABLE, false);
+    m_dbRamLimitEnable->setChecked(ramLimitEnable);
+
+    int ramLimit = cfg->getInt(Config::KEY_DB_RAM_LIMIT, 50);
+    if (m_dbType->currentItem() == (int)Config::DB_TYPE_MEMORY &&
+        !cfg->hasKey(Config::KEY_DB_RAM_LIMIT)) {
+        ramLimit = 50;
+    }
+    TQString ramText = TQString("%1MB").arg(ramLimit);
+    int ramIdx = tqt_idx_from_text(m_dbRamLimit, ramText);
+    m_dbRamLimit->setCurrentItem(ramIdx);
+
+    int ramPurgeInterval = cfg->getInt(Config::KEY_DB_RAM_PURGE_INTERVAL, 5);
+    if (m_dbType->currentItem() == (int)Config::DB_TYPE_MEMORY &&
+        !cfg->hasKey(Config::KEY_DB_RAM_PURGE_INTERVAL)) {
+        ramPurgeInterval = 5;
+    }
+    m_dbRamPurgeInterval->setValue(ramPurgeInterval);
+
+    updateDbTabStates();
 
     // Events columns (matches Python: statsDialog/show_columns_connections stores hidden columns)
     m_evtColTime->setChecked(true);
@@ -888,6 +940,15 @@ void PreferencesDialog::applySettings(bool doSync)
     cfg->setSetting(Config::KEY_DB_PURGE_OLDEST, (bool)m_dbPurgeEnable->isChecked());
     cfg->setSetting(Config::KEY_DB_MAX_DAYS, (int)m_dbMaxDays->value());
     cfg->setSetting(Config::KEY_DB_PURGE_INTERVAL, (int)m_dbPurgeInterval->value());
+
+    cfg->setSetting(Config::KEY_DB_RAM_LIMIT_ENABLE, (bool)m_dbRamLimitEnable->isChecked());
+    TQString ramText = m_dbRamLimit->currentText();
+    int ramVal = 50;
+    if (ramText.endsWith("MB")) {
+        ramVal = ramText.left(ramText.length() - 2).toInt();
+    }
+    cfg->setSetting(Config::KEY_DB_RAM_LIMIT, ramVal);
+    cfg->setSetting(Config::KEY_DB_RAM_PURGE_INTERVAL, (int)m_dbRamPurgeInterval->value());
 
     // Events columns: store hidden columns (as strings) like Python
     {
@@ -1040,7 +1101,35 @@ void PreferencesDialog::onCloseClicked()
 
 void PreferencesDialog::onDbTypeChanged(int idx)
 {
-    bool isMem = (idx == (int)Config::DB_TYPE_MEMORY);
+    (void)idx;
+    updateDbTabStates();
+}
+
+void PreferencesDialog::onDbPurgeToggled(bool enabled)
+{
+    if (enabled && m_dbRamLimitEnable && m_dbRamLimitEnable->isChecked()) {
+        m_dbRamLimitEnable->blockSignals(true);
+        m_dbRamLimitEnable->setChecked(false);
+        m_dbRamLimitEnable->blockSignals(false);
+    }
+    updateDbTabStates();
+}
+
+void PreferencesDialog::onDbRamLimitToggled(bool enabled)
+{
+    if (enabled && m_dbPurgeEnable && m_dbPurgeEnable->isChecked()) {
+        m_dbPurgeEnable->blockSignals(true);
+        m_dbPurgeEnable->setChecked(false);
+        m_dbPurgeEnable->blockSignals(false);
+    }
+    updateDbTabStates();
+}
+
+void PreferencesDialog::updateDbTabStates()
+{
+    if (!m_dbType) return;
+
+    bool isMem = (m_dbType->currentItem() == (int)Config::DB_TYPE_MEMORY);
     bool isFile = !isMem;
 
     if (m_dbMemHint)
@@ -1052,16 +1141,37 @@ void PreferencesDialog::onDbTypeChanged(int idx)
     if (m_dbMemUsageRefresh)
         m_dbMemUsageRefresh->setShown(isMem);
 
+    if (m_dbLowResLabel)
+        m_dbLowResLabel->setShown(isMem);
+
     set_enabled_recursive(m_dbFile, isFile);
     set_enabled_recursive(m_dbFileBtn, isFile);
     set_enabled_recursive(m_dbWal, isFile);
 
-    set_enabled_recursive(m_dbPurgeEnable, isMem);
-    set_enabled_recursive(m_dbMaxDays, isMem && m_dbPurgeEnable->isChecked());
-    set_enabled_recursive(m_dbPurgeInterval, isMem && m_dbPurgeEnable->isChecked());
+    if (isMem) {
+        set_enabled_recursive(m_dbPurgeEnable, true);
+        set_enabled_recursive(m_dbRamLimitEnable, true);
 
-    if (isMem && m_dbMemUsage)
-        m_dbMemUsage->setText(db_mem_usage_html());
+        bool purgeEnabled = m_dbPurgeEnable->isChecked();
+        bool ramLimitEnabled = m_dbRamLimitEnable->isChecked();
+
+        set_enabled_recursive(m_dbMaxDays, purgeEnabled);
+        set_enabled_recursive(m_dbPurgeInterval, purgeEnabled);
+
+        set_enabled_recursive(m_dbRamLimit, ramLimitEnabled);
+        set_enabled_recursive(m_dbRamPurgeInterval, ramLimitEnabled);
+
+        if (m_dbMemUsage && m_dbMemUsage->isShown())
+            m_dbMemUsage->setText(currentDbMemUsageHtml());
+    } else {
+        set_enabled_recursive(m_dbPurgeEnable, false);
+        set_enabled_recursive(m_dbMaxDays, false);
+        set_enabled_recursive(m_dbPurgeInterval, false);
+
+        set_enabled_recursive(m_dbRamLimitEnable, false);
+        set_enabled_recursive(m_dbRamLimit, false);
+        set_enabled_recursive(m_dbRamPurgeInterval, false);
+    }
 }
 
 void PreferencesDialog::onPrefsTabChanged(TQWidget* w)
@@ -1079,7 +1189,7 @@ void PreferencesDialog::onPrefsTabChanged(TQWidget* w)
 
     const bool isMem = (m_dbType->currentItem() == (int)Config::DB_TYPE_MEMORY);
     if (isMem && m_dbMemUsage->isShown())
-        m_dbMemUsage->setText(db_mem_usage_html());
+        m_dbMemUsage->setText(currentDbMemUsageHtml());
 }
 
 void PreferencesDialog::onDbMemUsageRefreshClicked()
@@ -1088,12 +1198,19 @@ void PreferencesDialog::onDbMemUsageRefreshClicked()
         return;
     if (m_dbType->currentItem() != (int)Config::DB_TYPE_MEMORY)
         return;
-    m_dbMemUsage->setText(db_mem_usage_html());
+    m_dbMemUsage->setText(currentDbMemUsageHtml());
 }
 
-void PreferencesDialog::onDbPurgeToggled(bool enabled)
+TQString PreferencesDialog::currentDbMemUsageHtml()
 {
-    bool isMem = (m_dbType->currentItem() == (int)Config::DB_TYPE_MEMORY);
-    set_enabled_recursive(m_dbMaxDays, isMem && enabled);
-    set_enabled_recursive(m_dbPurgeInterval, isMem && enabled);
+    if (m_dbRamLimitEnable && m_dbRamLimitEnable->isChecked() && m_dbRamLimit) {
+        TQString ramText = m_dbRamLimit->currentText();
+        int ramVal = 50;
+        if (ramText.endsWith("MB")) {
+            ramVal = ramText.left(ramText.length() - 2).toInt();
+        }
+        unsigned long long limitBytes = (unsigned long long)ramVal * 1024ULL * 1024ULL;
+        return db_mem_usage_html(true, limitBytes);
+    }
+    return db_mem_usage_html(false, 0);
 }

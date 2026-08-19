@@ -55,6 +55,8 @@ public:
 
     void show();
 
+    void setMainWindow(TQWidget* mainWin);
+
     void setIconConnected();
     void setIconDisconnected();
     void setIconPaused();
@@ -78,6 +80,7 @@ private slots:
         emit toggleMainWindow();
     }
     void onShowMain();
+    void onMenuAboutToShow();
     void onEnableInterception();
     void onDisableInterception();
     void onHelp();
@@ -108,6 +111,8 @@ private:
     int m_menuIdFwToggle;
     int m_menuIdHelp;
     int m_menuIdQuit;
+
+    TQWidget* m_mainWin;
 };
 
 #endif // OPENSNITCH_SYSTRAY_H

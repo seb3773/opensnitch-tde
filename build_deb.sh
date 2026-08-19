@@ -25,7 +25,6 @@ need_cmd pkg-config
 need_cmd protoc
 need_cmd grpc_cpp_plugin
 need_cmd dpkg-deb
-need_cmd dpkg-shlibdeps
 need_cmd strip
 need_cmd sed
 need_cmd awk
@@ -85,23 +84,11 @@ else
 	echo "warning: missing $ICON_SRC (application icon will not be installed)" >&2
 fi
 
-# Compute runtime dependencies from the staged binary.
-DEBIAN_TMP_DIR="$PKGTMP/debian"
-mkdir -p -- "$DEBIAN_TMP_DIR"
-: > "$DEBIAN_TMP_DIR/substvars"
+# Specify explicit optimal runtime dependencies
+DEPENDS="tdelibs14-trinity (>= 4:14.1.1), opensnitch"
 
+# Strip the staged binary
 STAGED_BIN="$PKGROOT/usr/bin/opensnitch-tde"
-SHLIBS_DEPENDS=""
-if test -x "$STAGED_BIN"; then
-	SHLIBS_DEPENDS="$(
-		(cd "$PKGTMP" && dpkg-shlibdeps -O -T "$DEBIAN_TMP_DIR/substvars" -S"$PKGROOT" -e "$STAGED_BIN" 2>/dev/null) |
-		sed -n 's/^shlibs:Depends=//p'
-	)" || SHLIBS_DEPENDS=""
-fi
-
-DEPENDS="$SHLIBS_DEPENDS"
-
-# Strip the staged binary after dependency extraction.
 if command -v sstrip >/dev/null 2>&1; then
 	echo "info: stripping with sstrip"
 	sstrip "$STAGED_BIN" >/dev/null 2>&1 || true

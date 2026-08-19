@@ -39,6 +39,8 @@ private slots:
     void onPrefsTabChanged(TQWidget* w);
     void onDbTypeChanged(int idx);
     void onDbPurgeToggled(bool enabled);
+    void onDbRamLimitToggled(bool enabled);
+    void updateDbTabStates();
     void onDbMemUsageRefreshClicked();
     void onSelectDbFile();
 
@@ -49,6 +51,7 @@ private:
     void setupUi();
     void loadSettings();
     void applySettings(bool doSync);
+    TQString currentDbMemUsageHtml();
 
 protected:
     void showEvent(TQShowEvent* ev);
@@ -119,6 +122,11 @@ protected:
     TQCheckBox*  m_dbPurgeEnable;
     TQSpinBox*   m_dbMaxDays;
     TQSpinBox*   m_dbPurgeInterval;
+
+    TQLabel*     m_dbLowResLabel;
+    TQCheckBox*  m_dbRamLimitEnable;
+    TQComboBox*  m_dbRamLimit;
+    TQSpinBox*   m_dbRamPurgeInterval;
 
     // Bottom buttons
     TQPushButton* m_btnClose;

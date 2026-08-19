@@ -61,6 +61,17 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
+## Packaging (.deb, .qsi)
+
+- **Debian Package (`.deb`)**:
+  ```bash
+  ./build_deb.sh
+  ```
+- **Q4OS Installer (`.qsi`)**:
+  ```bash
+  ./build_qsi.sh
+  ```
+
 ## Notes
 
 This is a UI-only port. The firewall logic remains in the upstream OpenSnitch daemon.

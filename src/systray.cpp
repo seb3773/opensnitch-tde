@@ -20,7 +20,8 @@
 SysTray::SysTray(TQObject* parent, const char* name)
     : TQObject(parent, name),
       m_fwEnabled(false),
-      m_connected(false)
+      m_connected(false),
+      m_mainWin(0)
 {
     setupIcons();
 
@@ -31,6 +32,7 @@ SysTray::SysTray(TQObject* parent, const char* name)
 
     // Use the custom menu (no TDE-injected Quit)
     m_menu = m_tray->customMenu;
+    connect(m_menu, SIGNAL(aboutToShow()), this, SLOT(onMenuAboutToShow()));
 
     m_menuIdMain = m_menu->insertItem(i18n("Open main window"), this, TQT_SLOT(onShowMain()));
     m_menuIdFwToggle = m_menu->insertItem(i18n("Disable"), this, TQT_SLOT(onDisableInterception()));
@@ -158,9 +160,25 @@ void SysTray::onDaemonSubscribed(const TQString& peer, bool firewallRunning)
     updateIcon();
 }
 
+void SysTray::setMainWindow(TQWidget* mainWin)
+{
+    m_mainWin = mainWin;
+}
+
+void SysTray::onMenuAboutToShow()
+{
+    if (m_mainWin) {
+        if (m_mainWin->isVisible() && !m_mainWin->isMinimized()) {
+            m_menu->changeItem(m_menuIdMain, i18n("Hide main window"));
+        } else {
+            m_menu->changeItem(m_menuIdMain, i18n("Open main window"));
+        }
+    }
+}
+
 void SysTray::onShowMain()
 {
-    emit showMainWindow();
+    emit toggleMainWindow();
 }
 
 void SysTray::onEnableInterception()

@@ -211,6 +211,7 @@ int main(int argc, char** argv)
 
     // Create main window
     g_mainWin = new MainWindow();
+    g_tray->setMainWindow(g_mainWin);
     // daemonConnected state is set by onDaemonSubscribed when daemon connects
 
     // Create prompt dialog

@@ -106,6 +106,9 @@ public:
     static const char* KEY_DB_PURGE_OLDEST;
     static const char* KEY_DB_MAX_DAYS;
     static const char* KEY_DB_PURGE_INTERVAL;
+    static const char* KEY_DB_RAM_LIMIT_ENABLE;
+    static const char* KEY_DB_RAM_LIMIT;
+    static const char* KEY_DB_RAM_PURGE_INTERVAL;
     static const char* KEY_DB_JRNL_WAL;
     static const char* KEY_NOTIFICATIONS_ENABLED;
     static const char* KEY_NOTIFICATIONS_TYPE;
