@@ -1,0 +1,16 @@
+Package: opensnitch-tde
+Version: 1.5.8
+Architecture: amd64
+Maintainer: seb3773
+Installed-Size: 1032
+Depends: tdelibs14-trinity (>= 4:14.1.1), opensnitch
+Filename: pool/main/o/opensnitch-tde/opensnitch-tde_1.5.8_amd64.deb
+Size: 297156
+MD5sum: 9e205997e7e2393c7ac55b7fc3b405af
+SHA1: 93d0319b0eed0303f76ad6cfbb621b16befe0d34
+SHA256: a442a400e5ec7859439fdd9fd31bf77c8e3949b18e89719e9482406a1f102a78
+Section: admin
+Priority: optional
+Description: OpenSnitch UI (TQt3/TDE) native port
+ Native TQt3 / Trinity Desktop UI port for OpenSnitch.
+
