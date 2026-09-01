@@ -1,24 +1,24 @@
 Architectures: amd64
 Codename: stable
 Components: main
-Date: Thu, 27 Aug 2026 10:53:39 +0000
+Date: Tue, 01 Sep 2026 00:04:53 +0000
 Description: Official APT Repository for OpenSnitch TDE (Trinity Desktop Environment native port)
 Label: OpenSnitch TDE Repository
 Origin: OpenSnitchTDE
 Suite: stable
 MD5Sum:
- 99a056991ae76f56974928ce38fab256              260 Release
+ 9072ad052dfc142fb56aba7ce5445b27              260 Release
  f53ed4df5b8fa8a463e75696ba6ca34e              535 main/binary-amd64/Packages
- a8e930f591b188161e67ec8629084eed              393 main/binary-amd64/Packages.gz
+ dada1352b44d1546c0b268eb45d14bc0              393 main/binary-amd64/Packages.gz
 SHA1:
- 31d8cc0782f188076dbe9a6a839f25436555cb2f              260 Release
+ 192d9694be7861c37e28f0dc630316d7d814e9ae              260 Release
  28f678ef5435e87954593b90ff851dc4d2230603              535 main/binary-amd64/Packages
- e24a92adffd3982c4325a6b0318aacd129486e79              393 main/binary-amd64/Packages.gz
+ c76c2e4e1f1cff94fb1b1efb8b63da4dddaf0300              393 main/binary-amd64/Packages.gz
 SHA256:
- 64eef6bd54b41181d44bbc62c0a651c37ae134a7892fd16e1f60ce97ec99f875              260 Release
+ fc9662b99b3b6e1eb7857429b394b834343b219ba8313c3c247101b3a5b0377d              260 Release
  bd1d8373bfb51db51e8f8f337d03eba354abea8406c5d66e5917e34970604e1b              535 main/binary-amd64/Packages
- dfec3209147bc43a909438cd99e917f07ded3f94c403d4e46cc79f0222b636e5              393 main/binary-amd64/Packages.gz
+ 50781864367eea4f498cc36131f44874069758434f4952fd826a8763521bc3c5              393 main/binary-amd64/Packages.gz
 SHA512:
- 735934c88c414e76e99169590f1e60cde1a773d7663f539fd706234bb7ddd05a4681e813ee552d97e8ad93d969e0b6c68b9a9926c47d61cb25d862ee049de492              260 Release
+ e573977d64f7b01e230a9c2ab2210921013fe183fea0c7abbe5a7ab1f8a21c2202f96d45cb1b2d2c330f24caa2acfc06646c5e39a80af641a8d5c955a5024770              260 Release
  f5b7f7c1cc7ae04ab7ae10d611eee74ca02a3a84248a3ddc2ed6189c5948acae27a105713013899bba3403773e5dce42f42c95e465e7cc62b3fd993e93e9ec92              535 main/binary-amd64/Packages
- 8609e97d1fa78a90036cda804705709a036adf0c0b262f2ed27fbfa68d915701a04d4d159239d699d0d56810257e16d45f929f4ea21b0060814cbf8413c89a84              393 main/binary-amd64/Packages.gz
+ 92ee0f4fd98bce41ffe84569d25e4b18090e1050d69cd312feab502214bbd29af344ac5ff1b94f1beed7c133a70a0d963a8fc7dfeff1c8bac4d0c19a9012a5f7              393 main/binary-amd64/Packages.gz
