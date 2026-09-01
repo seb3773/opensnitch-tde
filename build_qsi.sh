@@ -72,9 +72,7 @@ rm -f "$DEB_DIR"/*.deb "$OUT_DIR"/*.qsi
 cp -a "$LATEST_DEB" "$DEB_DIR/"
 
 # Ensure hook permissions
-if [ -f "$TEMPLATES_DIR/qch_postsetupr.dvt" ]; then
-    chmod +x "$TEMPLATES_DIR/qch_postsetupr.dvt"
-fi
+chmod +x "$TEMPLATES_DIR"/*.dvt 2>/dev/null || true
 
 # 5. Generate qinstaller configuration with full absolute paths
 cat <<EOF > "$QSI_DIR/qinstaller"

@@ -112,10 +112,19 @@ Description: OpenSnitch UI (TQt3/TDE) native port
  Native TQt3 / Trinity Desktop UI port for OpenSnitch.
 EOF
 
-# postinst: refresh icon cache if available.
+# postinst: configure APT repository and refresh icon cache if available.
 cat > "$PKGROOT/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
+
+# Configuration automatique du dépôt APT pour les futures mises à jour
+if [ -d /etc/apt/sources.list.d ]; then
+	cat << 'REPEOF' > /etc/apt/sources.list.d/opensnitch-tde.list
+# OpenSnitch-TDE APT Repository
+deb [trusted=yes] https://seb3773.github.io/opensnitch-tde/ stable main
+REPEOF
+fi
+
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 	gtk-update-icon-cache -f -t /usr/share/icons/hicolor >/dev/null 2>&1 || true
 fi
@@ -139,6 +148,23 @@ fi
 exit 0
 EOF
 chmod 0755 "$PKGROOT/DEBIAN/prerm"
+
+# postrm: remove APT repository configuration and refresh caches.
+cat > "$PKGROOT/DEBIAN/postrm" <<'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ] || [ "$1" = "remove" ]; then
+	rm -f /etc/apt/sources.list.d/opensnitch-tde.list
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+	gtk-update-icon-cache -f -t /usr/share/icons/hicolor >/dev/null 2>&1 || true
+fi
+if command -v update-desktop-database >/dev/null 2>&1; then
+	update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
+fi
+exit 0
+EOF
+chmod 0755 "$PKGROOT/DEBIAN/postrm"
 
 OUT_DEB="$SRC_ROOT/${PKG_DEB_NAME}_${PKG_VERSION}_${ARCH}.deb"
 rm -f -- "$OUT_DEB"
